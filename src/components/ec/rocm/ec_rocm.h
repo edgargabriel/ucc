@@ -80,6 +80,8 @@ typedef struct ucc_ec_rocm_config {
     unsigned long                  exec_num_streams;
     unsigned long                  reduce_num_blocks;
     int                            reduce_num_threads;
+    int                            reduce_host_limit;
+    int                            copy_host_limit;
 } ucc_ec_rocm_config_t;
 
 typedef struct ucc_ec_rocm {

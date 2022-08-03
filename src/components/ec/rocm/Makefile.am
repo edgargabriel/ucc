@@ -12,6 +12,7 @@ sources =                                \
 	ec_rocm_executor.h               \
 	ec_rocm_executor.c               \
 	ec_rocm_executor_interruptible.c \
+	ec_rocm_host_operations.c        \
 	ec_rocm_executor_persistent.c
 
 module_LTLIBRARIES         = libucc_ec_rocm.la

@@ -9,6 +9,60 @@
 #include "components/mc/ucc_mc.h"
 #include "utils/ucc_atomic.h"
 
+static bool ucc_ec_rocm_copy_multi_use_host (const ucc_ee_executor_task_args_t* task_args)
+{
+    bool result = true;
+
+    for (int i = 0; i < task_args->copy_multi.num_vectors; i++) {
+        if (task_args->copy_multi.counts[i] > EC_ROCM_CONFIG->copy_host_limit) {
+            result = false;
+            break;
+        }
+    }
+
+    return result;
+}
+
+static int ucc_ec_rocm_total_reduce_len(const ucc_ee_executor_task_args_t* task_args)
+{
+    int             total_len = 0;
+    ucc_datatype_t  dt;
+    size_t          count;
+
+    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+        dt    = task_args->reduce.dt;
+        count = task_args->reduce.count;
+    } else {
+        ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        dt    = task_args->reduce_strided.dt;
+        count = task_args->reduce_strided.count;
+    }
+    total_len += count * ucc_dt_size(dt);
+
+    return total_len;
+}
+
+static bool ucc_ec_rocm_host_dt_supported(const ucc_ee_executor_task_args_t*  task_args)
+{
+    bool            result = false;
+    ucc_datatype_t  dt;
+
+    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+        dt     = task_args->reduce.dt;
+    } else {
+        ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        dt     = task_args->reduce_strided.dt;
+    }
+    if (dt != UCC_DT_BFLOAT16        &&
+        dt != UCC_DT_FLOAT16         &&
+        dt != UCC_DT_FLOAT32_COMPLEX &&
+        dt != UCC_DT_FLOAT64_COMPLEX) {
+        result = true;
+    }
+    return result;
+}
+
+
 ucc_status_t ucc_rocm_executor_interruptible_get_stream(hipStream_t *stream)
 {
     static uint32_t last_used   = 0;
@@ -53,6 +107,7 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          ucc_ee_executor_task_t **task)
 {
     ucc_ec_rocm_executor_interruptible_task_t *ee_task;
+    ucc_ec_rocm_executor_interruptible_task_t *tmp_task=NULL;
     hipStream_t stream;
     ucc_status_t status;
 
@@ -77,17 +132,42 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
     memcpy(&ee_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
     switch (task_args->task_type) {
     case UCC_EE_EXECUTOR_TASK_COPY:
-        status = ROCM_FUNC(hipMemcpyAsync(task_args->copy.dst,
-                                          task_args->copy.src,
-                                          task_args->copy.len, hipMemcpyDefault,
-                                          stream));
+        if (task_args->copy.len <= EC_ROCM_CONFIG->copy_host_limit) {
+            tmp_task = ucc_mpool_get(&ucc_ec_rocm.executor_interruptible_tasks);
+            if (ucc_unlikely(!tmp_task)) {
+                ec_error(&ucc_ec_rocm.super, "failed to get task from mpool");
+                goto free_task;
+            }
+            memcpy(&tmp_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
+            status = ROCM_FUNC(hipStreamAddCallback(stream,
+                                                    ucc_ec_rocm_host_memcpy,
+                                                    (void*)tmp_task, 0));
+        } else {
+             status = ROCM_FUNC(hipMemcpyAsync(task_args->copy.dst,
+                                              task_args->copy.src,
+                                              task_args->copy.len,
+                                              hipMemcpyDefault,
+                                              stream));
+        }
         if (ucc_unlikely(status != UCC_OK)) {
             ec_error(&ucc_ec_rocm.super, "failed to start memcpy op");
             goto free_task;
         }
-      break;
+        break;
     case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-        status = ucc_ec_rocm_copy_multi_kernel(task_args, stream);
+        if (ucc_ec_rocm_copy_multi_use_host(task_args)) {
+            tmp_task = ucc_mpool_get(&ucc_ec_rocm.executor_interruptible_tasks);
+            if (ucc_unlikely(!tmp_task)) {
+                ec_error(&ucc_ec_rocm.super, "failed to get task from mpool");
+                goto free_task;
+            }
+            memcpy(&tmp_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
+            status = ROCM_FUNC(hipStreamAddCallback(stream,
+                                                    ucc_ec_rocm_host_memcpy_multi,
+                                                    (void*)tmp_task, 0));
+        } else {
+            status = ucc_ec_rocm_copy_multi_kernel(task_args, stream);
+        }
         if (ucc_unlikely(status != UCC_OK)) {
             ec_error(&ucc_ec_rocm.super, "failed to start copy multi op");
             goto free_task;
@@ -95,8 +175,19 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
         break;
     case UCC_EE_EXECUTOR_TASK_REDUCE:
     case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
-        status = ucc_ec_rocm_reduce((ucc_ee_executor_task_args_t *)task_args,
-                                    stream);
+        if (ucc_ec_rocm_total_reduce_len(task_args) <= EC_ROCM_CONFIG->reduce_host_limit &&
+            ucc_ec_rocm_host_dt_supported(task_args) ) {
+            tmp_task = ucc_mpool_get(&ucc_ec_rocm.executor_interruptible_tasks);
+            if (ucc_unlikely(!tmp_task)) {
+                ec_error(&ucc_ec_rocm.super, "failed to get task from mpool");
+                goto free_task;
+            }
+            memcpy(&tmp_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
+            status = ucc_ec_rocm_host_reduce (tmp_task, stream);
+        } else {
+            status = ucc_ec_rocm_reduce((ucc_ee_executor_task_args_t *)task_args,
+                                        stream);
+        }
         if (ucc_unlikely(status != UCC_OK)) {
             ec_error(&ucc_ec_rocm.super, "failed to start reduce op");
             goto free_task;
@@ -119,6 +210,9 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
 free_task:
     ucc_ec_rocm_event_destroy(ee_task->event);
     ucc_mpool_put(ee_task);
+    if (NULL != tmp_task) {
+        ucc_mpool_put(tmp_task);
+    }
     return status;
 }
 

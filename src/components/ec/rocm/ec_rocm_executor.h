@@ -35,4 +35,11 @@ ucc_status_t ucc_ec_rocm_persistent_kernel_start(ucc_ec_rocm_executor_t *eee);
 
 ucc_status_t ucc_ec_rocm_reduce(ucc_ee_executor_task_args_t *task,
                                 hipStream_t                  stream);
+
+ucc_status_t ucc_ec_rocm_host_reduce (ucc_ec_rocm_executor_interruptible_task_t* task,
+                                      hipStream_t                                stream);
+
+void ucc_ec_rocm_host_memcpy (hipStream_t stream, hipError_t status, void *args);
+void ucc_ec_rocm_host_memcpy_multi (hipStream_t stream, hipError_t status, void *args);
+
 #endif
