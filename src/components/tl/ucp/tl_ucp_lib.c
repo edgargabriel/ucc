@@ -65,7 +65,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
             }
         }
     }
-    tl_info(&self->super, "initialized lib object: %p", self);
+    //tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
 
 err_cfg:
@@ -78,7 +78,7 @@ err:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)
 {
-    tl_info(&self->super, "finalizing lib object: %p", self);
+  //tl_info(&self->super, "finalizing lib object: %p", self);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_lib_t, ucc_tl_lib_t);

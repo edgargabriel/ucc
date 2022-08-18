@@ -152,7 +152,7 @@ ucc_status_t ucc_tl_rccl_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_rccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
     ucc_status_t       status = UCC_OK ;
 
-    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    //tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     ucc_tl_rccl_free_task(task);
     return status;
 }

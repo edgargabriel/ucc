@@ -47,14 +47,14 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
         self->tl_ctxs = NULL;
         return UCC_ERR_NOT_FOUND;
     }
-    cl_info(cl_config->cl_lib, "initialized cl context: %p", self);
+    //cl_info(cl_config->cl_lib, "initialized cl context: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
 {
     int i;
-    cl_info(self->super.super.lib, "finalizing cl context: %p", self);
+    //cl_info(self->super.super.lib, "finalizing cl context: %p", self);
     for (i = 0; i < self->n_tl_ctxs; i++) {
         ucc_tl_context_put(self->tl_ctxs[i]);
     }

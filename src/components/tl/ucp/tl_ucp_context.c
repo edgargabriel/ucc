@@ -160,7 +160,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         self->eps     = NULL;
         self->ep_hash = kh_init(tl_ucp_ep_hash);
     }
-    tl_info(self->super.super.lib, "initialized tl context: %p", self);
+    //tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
 err_thread_mode:
@@ -235,7 +235,7 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+  //tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_tl_ucp_close_eps(self);
     if (self->eps) {
         ucc_free(self->eps);

@@ -55,7 +55,7 @@ free_unique_id:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_rccl_team_t)
 {
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    //tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->rccl_comm) {
         ncclCommDestroy(self->rccl_comm);
         hipStreamDestroy(self->stream);
@@ -111,7 +111,7 @@ ucc_status_t ucc_tl_rccl_team_create_test(ucc_base_team_t *tl_team)
         goto free_stream;
     }
     ucc_free(team->unique_id);
-    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
+    //tl_info(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
 
 free_stream:
@@ -183,7 +183,7 @@ ucc_status_t ucc_tl_rccl_coll_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         goto free_task;
     }
-    tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
+    //tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
     *task_h = &task->super;
     return status;
 

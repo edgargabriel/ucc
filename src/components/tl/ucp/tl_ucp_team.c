@@ -32,13 +32,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
 
-    tl_info(tl_context->lib, "posted tl team: %p", self);
+    //tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_team_t)
 {
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+  //tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t);
@@ -115,7 +115,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         }
     }
 
-    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
+    //tl_info(tl_team->context->lib, "initialized tl team: %p", team);
     team->status = UCC_OK;
     return UCC_OK;
 
